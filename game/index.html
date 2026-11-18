@@ -3,17 +3,109 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
+<link rel="icon" href="data:,">
+<title>Solmar Heat — an open-world crime game</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e13; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #eef1f5; }
   #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
   #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8, 10, 16, 0.72); z-index: 20; }
+  .panel { max-width: 640px; width: 92%; background: #161a22; border: 1px solid #2c3340; border-radius: 14px; padding: 28px 32px; box-shadow: 0 18px 60px rgba(0,0,0,0.6); }
+  .panel h1 { margin: 0 0 4px; font-size: 44px; letter-spacing: 2px; color: #ffb13c; }
+  .panel h2 { margin: 0 0 10px; font-size: 34px; color: #ffb13c; }
+  .panel p { color: #c3c9d4; line-height: 1.55; margin: 8px 0; }
+  .panel .sub { color: #8b93a3; font-size: 14px; letter-spacing: 3px; text-transform: uppercase; }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; margin: 14px 0; font-size: 14px; color: #c3c9d4; }
+  .controls b { color: #fff; display: inline-block; min-width: 74px; }
+  button { background: #ffb13c; color: #181206; border: 0; border-radius: 8px; padding: 12px 22px; font-size: 16px; font-weight: 700; cursor: pointer; margin: 6px 8px 0 0; }
+  button.ghost { background: transparent; color: #eef1f5; border: 1px solid #4a5261; }
+  button:hover { filter: brightness(1.1); }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
+  #hud-topleft { position: absolute; top: 16px; left: 18px; }
+  #hud-money { font-size: 26px; font-weight: 800; text-shadow: 0 2px 6px #000; }
+  #hud-health { width: 210px; height: 12px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; margin-top: 6px; overflow: hidden; }
+  #hud-health-fill { height: 100%; width: 100%; background: #3cff7a; }
+  #hud-stars { font-size: 26px; letter-spacing: 3px; margin-top: 4px; text-shadow: 0 2px 6px #000; }
+  #hud-clock { position: absolute; top: 16px; right: 18px; font-size: 15px; font-weight: 700; text-shadow: 0 2px 6px #000; }
+  #hud-objective { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); max-width: 46%; background: rgba(0,0,0,0.55); border-radius: 8px; padding: 8px 14px; font-size: 15px; font-weight: 600; text-align: center; }
+  #hud-minimap { position: absolute; left: 18px; bottom: 18px; width: 220px; height: 220px; border: 2px solid rgba(255,255,255,0.4); border-radius: 8px; background: #10141a; }
+  #hud-bottomright { position: absolute; right: 18px; bottom: 18px; text-align: right; text-shadow: 0 2px 6px #000; }
+  #hud-weapon { font-size: 15px; font-weight: 700; letter-spacing: 2px; }
+  #hud-ammo { font-size: 28px; font-weight: 800; }
+  #hud-speed { font-size: 18px; font-weight: 700; }
+  #hud-crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); opacity: 0.9; }
+  #hud-crosshair::before, #hud-crosshair::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 4px #000; }
+  #hud-crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #hud-crosshair::after { left: 0; top: 10px; width: 22px; height: 2px; }
+  #hud-hitmarker { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(45deg); font-size: 30px; color: #fff; opacity: 0; text-shadow: 0 0 6px #000; }
+  #hud-toast { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); background: rgba(0,0,0,0.65); padding: 9px 18px; border-radius: 8px; font-size: 16px; font-weight: 600; opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
+  #hud-dialogue { position: absolute; left: 50%; bottom: 170px; transform: translateX(-50%); max-width: 620px; background: rgba(0,0,0,0.65); padding: 10px 18px; border-radius: 8px; font-size: 15px; font-style: italic; color: #ffe9a8; opacity: 0; transition: opacity 0.3s; text-align: center; }
+  #hud-damage { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,0.55) 100%); opacity: 0; }
 </style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
+<canvas id="game" aria-label="Solmar Heat: an open-world crime game in Solmar City"></canvas>
 <p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud">
+  <div id="hud-damage"></div>
+  <div id="hud-topleft">
+    <div id="hud-money">$0</div>
+    <div id="hud-health"><div id="hud-health-fill"></div></div>
+    <div id="hud-stars">☆☆☆☆☆</div>
+  </div>
+  <div id="hud-clock">18:00 SOLMAR CITY</div>
+  <div id="hud-objective"></div>
+  <canvas id="hud-minimap" width="220" height="220"></canvas>
+  <div id="hud-bottomright">
+    <div id="hud-weapon">PISTOL</div>
+    <div id="hud-ammo">12 / 120</div>
+    <div id="hud-speed"></div>
+  </div>
+  <div id="hud-crosshair"></div>
+  <div id="hud-hitmarker">✕</div>
+  <div id="hud-toast"></div>
+  <div id="hud-dialogue"></div>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="panel">
+    <div class="sub">Solmar City &middot; an open-world crime game</div>
+    <h1>SOLMAR HEAT</h1>
+    <p>Mara Reyes, getaway driver with no crew and one borrowed sedan, is about to make a name in Solmar City. Six missions, a whole city to steal, and the Solmar PD on your tail.</p>
+    <p>Drive, fight, lose the heat, and pull off the Big Score at the Solmar Grand Bank.</p>
+    <div class="controls">
+      <div><b>W A S D</b> Move / drive</div><div><b>Mouse</b> Look / aim, click to shoot</div>
+      <div><b>Shift</b> Sprint</div><div><b>Space</b> Jump / handbrake</div>
+      <div><b>E</b> Enter / exit car</div><div><b>F</b> Interact / pick up</div>
+      <div><b>R</b> Reload</div><div><b>1 / 2</b> Pistol / shotgun</div>
+    </div>
+    <p id="menu-save"></p>
+    <button id="btn-start">Start new story</button>
+    <button id="btn-continue" class="ghost">Continue</button>
+  </div>
+</div>
+
+<div id="pause" class="overlay" style="display:none">
+  <div class="panel">
+    <h2>Paused</h2>
+    <p>Solmar City waits for no one — except right now.</p>
+    <button id="btn-resume">Resume</button>
+    <button id="btn-menu" class="ghost">Back to menu</button>
+  </div>
+</div>
+
+<div id="end" class="overlay" style="display:none">
+  <div class="panel">
+    <h2 id="end-title">BUSTED</h2>
+    <p id="end-text"></p>
+    <button id="btn-respawn">Back on the street ($200 bail)</button>
+  </div>
+</div>
+
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>
